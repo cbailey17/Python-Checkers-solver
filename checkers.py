@@ -1,6 +1,6 @@
-'''
+"""
 @author: mroch
-'''
+"""
 
 # Game representation and mechanics
 import checkerboard
@@ -21,178 +21,102 @@ import checkerboard
 import imp
 import ai
 import sys
+
 major = sys.version_info[0]
 minor = sys.version_info[1]
 modpath = "__pycache__/tonto.cpython-{}{}.pyc".format(major, minor)
 tonto = imp.load_compiled("tonto", modpath)
 
-
-# human - human player, prompts for input    
-import human
-import boardlibrary # might be useful for debugging
-
 from timer import Timer
 from statistics import mean
-        
 
 
-#Where does the checkers strategy come into play
-
-def Game(red=ai.Strategy, black=tonto.Strategy, 
-         maxplies=1, init=None, verbose=True, firstmove=0):
-    """Game(red, black, maxplies, init, verbose, turn)
-    Start a game of checkers
-    red,black - Strategy classes (not instances)
-    maxplies - # of turns to explore (default 10)
-    init - Start with given board (default None uses a brand new game)
-    verbose - Show messages (default True)
-    firstmove - Player N starts 0 (red) or 1 (black).  Default 0. 
-    """
-
-    # Don't forget to create instances of your strategy,
-    # e.g. black('b', checkerboard.CheckerBoard, maxplies)
-     
-    "Define board and instances of the strategy"
+def Game(red=ai.Strategy, black=tonto.Strategy,
+         maxplies=2, init=None, verbose=True, firstmove=0):
+    """Game function for playing checkers"""
+    # Initialize variables and data structures
+    movenum, lastcap, pawn_move, count = 1, 0, 0, 0
+    movetimes = [[], []]
+    players = ['r', 'b']
+    # Define board and instances of the strategy and dictionarys for the players
     board = checkerboard.CheckerBoard()
-    redplayer = red('r',board, maxplies)
-    blackplayer = black('b', board, maxplies)
-    maxp1 = redplayer.maxplayer
-    minp2 = redplayer.minplayer
-    
-    "Initialize variables and data structures"
-    moveNum = 0
-    lastCap = 0
-    captures = 0
-    moveTimesp1 = []
-    moveTimesp2 = []
-    
-    #print out games initial information
-    print("Invoked Game(","red=", red,",","black=", black,",", "maxplies =", maxplies,")\n\n")
+    redplayer, blackplayer = red('r', board, maxplies),  black('b', board, maxplies)
+    player_strategies = {'r': redplayer, 'b': blackplayer}
+    strategies = {'r': "AI", 'b': "tonto"}
+
+    # print out games initial information
+    print("Invoked Game(", "red=", redplayer.__module__, ".Strategy", ",", "black=", blackplayer.__module__,
+          ".Strategy", ",", "maxplies =", maxplies, ")\n\n")
     print("How about a nice game of checkers?")
+
+    # Determine which player starts the game
+    current_player = players[firstmove]
+
+    tm = Timer()  # Timer for game in minutes
+    time_min = 0
     finished = False
-    
-    "Determine which player starts the game"
-    if firstmove == 1:
-        maxplayer = False
-    
-    #Begin loop for game
-    tm = Timer()  
-    while finished == False: 
-        minplayer = True
-        maxplayer = True  
-        #Red players moves
-        while maxplayer == True:
-            terminal, winner = board.is_terminal()
-            if terminal:
-                print("The game is finished")
-                if winner != None:
-                    print("player", winner, "wins") 
-                else: 
-                    print("The game is a draw")
-                    print("r average move time", mean(moveTimesp1))
-                    print("b average move time", mean(moveTimesp2)) 
-                    finished = True
-                    return
-            print("Player r turn")
-            print(board)
-            t = Timer()
+    while not finished:  # While game is not finished keep looping
+        # Check if the game is over
+        terminal, winner = board.is_terminal()
+        if terminal:
+            gameover(movetimes, winner, time_min)
+            return
 
-            move = redplayer.play(board)  
-            
-            moves_ = board.get_actions(maxp1)
-            for a in moves_:
-                cap = len(a[1]) > 2
-                if cap:
-                    captures += 1 
-                    lastCap = 0
-                    break
-                else: 
-                    lastCap += 1
-                    break
-            if cap:
-                print("move", moveNum, "by", maxp1, ":", "from", move[1][0], "to", \
-                      move[1][1][0:2],"capturing", move[1][1][2], " Result:")      
-            else:
-                print("move", moveNum, "by", maxp1, ":", "from", move[1][0], "to", \
-                      move[1][1], " Result:")  
-            board = board.move(move[1])
-            moveNum += 1
-            ts = round(t.elapsed_s(),2)
-            moveTimesp1.append(ts)
-            time_min = round(tm.elapsed_min(),2)             
-            
-            print(board)
-            print("Pawn/King count: r", board.get_pawnsN()[0], "R", board.get_kingsN()[0], \
-                  "b", board.get_pawnsN()[1], "B", board.get_kingsN()[1], "Time - move:", \
-                  ts, "s", "game", time_min, "m")
-            print("Moves since last capture", lastCap, "last pawn advance", 0,"\n")
-            maxplayer = False
-        #Black players moves  
-        while minplayer == True:
-            terminal, winner = board.is_terminal()
-            if terminal:
-                print("The game is finished")
-                if winner != None:
-                    print("player", winner, "wins") 
-                else: 
-                    print("The game is a draw")
-                    print("r average move time", mean(moveTimesp1))
-                    print("b average move time", mean(moveTimesp2))
-                    finished = True
-                    return 
-            print("Player b turn")
-            print(board)
-            t2 = Timer()
+        print("Player", current_player, "turn")
+        print(board)
+        if current_player == players[0]:
+            print(current_player, "thinking using", strategies.get(current_player), "strategy...")
 
-            move = blackplayer.play(board)     
-            moves_ = board.get_actions(maxp1)
-            for a in moves_:
-                cap = len(a[1]) > 2
-                if cap:
-                    captures += 1 
-                    lastCap = 0
-                    break
-                else: 
-                    lastCap += 1
-                    break                 
-            if cap:
-                print("move", moveNum, "by", minp2, ":", "from", move[1][0], "to", \
-                      move[1][1][0:2],"capturing", move[1][1][2], " Result:")      
-            else:
-                print("move", moveNum, "by", minp2, ":", "from", move[1][0], "to", \
-                      move[1][1], " Result:")  
-    
-            board = board.move(move[1])
-            moveNum += 1
-            ts = round(t2.elapsed_s(),2)
-            moveTimesp2.append(ts)
-            time_min = round(tm.elapsed_min(),2)
-            
-            "Print out board and results from the turn"
-            print(board)
-            print("Pawn/King count: r", board.get_pawnsN()[0], "R", \
-                  board.get_kingsN()[0], "b", board.get_pawnsN()[1], "B", \
-                  board.get_kingsN()[1], "Time - move:", ts, "s", "game", time_min, "m")
-            print("Moves since last capture", lastCap, "last pawn advance", captures, "\n")  
-            minplayer = False
-     
+        t = Timer()  # Timer for player moves
+        move = player_strategies.get(current_player).play(board)  # get action from current player strategy
+        piece = board.get(move[1][0][0], move[1][0][1])
+        # determine if the move is from a pawn
+        if board.ispawn(piece):
+            pawn_move = 0
+        else:
+            pawn_move += 1
 
-            
+        action_str = board.get_action_str(move[1])  # get action string then display data
+        if len(action_str) > 23:  # Check if there is a capture
+            lastcap = 0
+        else:
+            lastcap += 1
+
+        print("move", movenum, "by", current_player, ":", action_str, " Result:")
+        board = board.move(move[1])
+        movenum += 1
+        ts = round(t.elapsed_s(), 2)
+        if current_player == players[0]:
+            movetimes[0].append(ts)
+        else:
+            movetimes[1].append(ts)
+        time_min = round(tm.elapsed_min(), 2)
+
+        # Display data from the action and about the state of the game
+        print(board)
+        print("Pawn/King count: r", board.get_pawnsN()[0], "R", board.get_kingsN()[0],
+              "b", board.get_pawnsN()[1], "B", board.get_kingsN()[1], "Time - move:",
+              ts, "s", "game", time_min, "m")
+        print("Moves since last capture", lastcap, "last pawn advance", pawn_move, "\n")
+        current_player = board.other_player(current_player)
+
+
+def gameover(movetimes, winner, time_min):
+    """Check if the game is over"""
+    print("The game is finished")
+    if winner is not None:
+        print("player", winner, "wins")
+        return
+    else:
+        print("The game is a draw")
+        print("r average move time", mean(movetimes[0]))
+        print("b average move time", mean(movetimes[1]))
+        print("Total game time", time_min)
+    return
+
+
 if __name__ == "__main__":
-    #Game(init=boardlibrary.boards["multihop"])
-    #Game(init=boardlibrary.boards["StrategyTest1"])
-    #Game(init=boardlibrary.boards["EndGame1"], firstmove = 1)
+    # Game(init=boardlibrary.boards["multihop"])
+    # Game(init=boardlibrary.boards["StrategyTest1"])
+    # Game(init=boardlibrary.boards["EndGame1"], firstmove = 1)
     Game()
-        
-        
-#Questions:
-#1. why does tonto work with move[1] and not ai?
-    #2. plies acting weird
-    #3. accessing the action that corresponds to the utulity
-        
-                    
-            
-        
-
-    
-    
